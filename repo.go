@@ -89,39 +89,39 @@ func NewRepository(server *Server) (*Repository, error) {
 func (r *Repository) initStmt(db *sqlx.DB) error {
 	var err error
 
-	collectNodeOrigByParentIDStmt, err = db.PrepareNamed(`WITH RECURSIVE child (dn_orig, id, parent_id) AS
-	(
-		SELECT e.rdn_orig::::TEXT AS dn_orig, e.id, e.parent_id
-			FROM ldap_tree e WHERE e.parent_id = :parent_id 
-			UNION ALL
-				SELECT
-					e.rdn_orig || ',' || child.dn_orig,
-					e.id,
-					e.parent_id
-				FROM ldap_tree e, child
-				WHERE e.parent_id = child.id
-	)
-	SELECT id, dn_orig from child`)
-	if err != nil {
-		return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
-	}
+	// collectNodeOrigByParentIDStmt, err = db.PrepareNamed(`WITH RECURSIVE child (dn_orig, id, parent_id) AS
+	// (
+	// 	SELECT e.rdn_orig::::TEXT AS dn_orig, e.id, e.parent_id
+	// 		FROM ldap_tree e WHERE e.parent_id = :parent_id
+	// 		UNION ALL
+	// 			SELECT
+	// 				e.rdn_orig || ',' || child.dn_orig,
+	// 				e.id,
+	// 				e.parent_id
+	// 			FROM ldap_tree e, child
+	// 			WHERE e.parent_id = child.id
+	// )
+	// SELECT id, dn_orig from child`)
+	// if err != nil {
+	// 	return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
+	// }
 
-	collectNodeNormByParentIDStmt, err = db.PrepareNamed(`WITH RECURSIVE child (dn_norm, id, parent_id) AS
-	(
-		SELECT e.rdn_norm::::TEXT AS dn_norm, e.id, e.parent_id
-			FROM ldap_tree e WHERE e.parent_id = :parent_id 
-			UNION ALL
-				SELECT
-					e.rdn_norm || ',' || child.dn_norm,
-					e.id,
-					e.parent_id
-				FROM ldap_tree e, child
-				WHERE e.parent_id = child.id
-	)
-	SELECT id, dn_norm from child`)
-	if err != nil {
-		return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
-	}
+	// collectNodeNormByParentIDStmt, err = db.PrepareNamed(`WITH RECURSIVE child (dn_norm, id, parent_id) AS
+	// (
+	// 	SELECT e.rdn_norm::::TEXT AS dn_norm, e.id, e.parent_id
+	// 		FROM ldap_tree e WHERE e.parent_id = :parent_id
+	// 		UNION ALL
+	// 			SELECT
+	// 				e.rdn_norm || ',' || child.dn_norm,
+	// 				e.id,
+	// 				e.parent_id
+	// 			FROM ldap_tree e, child
+	// 			WHERE e.parent_id = child.id
+	// )
+	// SELECT id, dn_norm from child`)
+	// if err != nil {
+	// 	return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
+	// }
 
 	getDCStmt, err = db.PrepareNamed(fmt.Sprintf(`SELECT id, parent_id, uuid, created, updated, rdn_orig, attrs_orig
 		FROM ldap_entry
@@ -130,14 +130,14 @@ func (r *Repository) initStmt(db *sqlx.DB) error {
 		return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
 	}
 
-	getDCDNOrigStmt, err = db.PrepareNamed(fmt.Sprintf(`SELECT id, '' as dn_orig FROM ldap_tree
-		WHERE parent_id = %d`, ROOT_ID))
-	if err != nil {
-		return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
-	}
+	// getDCDNOrigStmt, err = db.PrepareNamed(fmt.Sprintf(`SELECT id, '' as dn_orig FROM ldap_tree
+	// 	WHERE parent_id = %d`, ROOT_ID))
+	// if err != nil {
+	// 	return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
+	// }
 
-	insertTreeStmt, err = db.PrepareNamed(`INSERT INTO ldap_tree (id, parent_id, rdn_norm, rdn_orig)
-		VALUES (:id, :parent_id, :rdn_norm, :rdn_orig)`)
+	insertTreeStmt, err = db.PrepareNamed(`INSERT INTO ldap_tree (id, parent_path, parent_dn_orig)
+		VALUES (:id, :parent_path, :parent_dn_orig)`)
 	if err != nil {
 		return xerrors.Errorf("Failed to initialize prepared statement: %w", err)
 	}
@@ -151,9 +151,15 @@ func (r *Repository) initStmt(db *sqlx.DB) error {
 	}
 
 	insertUnderDCStmt, err = db.PrepareNamed(fmt.Sprintf(`INSERT INTO ldap_entry (parent_id, rdn_norm, rdn_orig, uuid, created, updated, attrs_norm, attrs_orig)
-		SELECT (SELECT id FROM ldap_tree WHERE parent_id = %d) as parent_id, :rdn_norm, :rdn_orig, :uuid, :created, :updated, :attrs_norm, :attrs_orig
+		SELECT (SELECT id FROM ldap_entry WHERE parent_id = %d) as parent_id, :rdn_norm, :rdn_orig, :uuid, :created, :updated, :attrs_norm, :attrs_orig
 			WHERE 
-				NOT EXISTS (SELECT e.id FROM ldap_entry e, ldap_tree t WHERE e.parent_id = t.id AND t.parent_id = %d AND e.rdn_norm = :rdn_norm)
+				NOT EXISTS (SELECT e.id FROM ldap_entry e, ldap_tree t, ldap_entry pe
+					WHERE
+						e.parent_id = t.id
+						AND t.id = pe.id
+						AND pe.parent_id = %d
+						AND e.rdn_norm = :rdn_norm
+					)
 		RETURNING id, parent_id`, ROOT_ID, ROOT_ID))
 	if err != nil {
 		return xerrors.Errorf("Failed to initialize prepared statement: %w", err)

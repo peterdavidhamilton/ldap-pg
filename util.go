@@ -344,3 +344,12 @@ func isNoResult(err error) bool {
 	// see https://golang.org/pkg/database/sql/#pkg-variables
 	return err == sql.ErrNoRows
 }
+
+func reverse(ss []string) []string {
+	size := len(ss)
+	rtn := make([]string, size)
+	for i := 0; i < size; i++ {
+		rtn[i] = ss[size-i-1]
+	}
+	return rtn
+}

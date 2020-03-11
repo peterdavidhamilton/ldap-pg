@@ -6,14 +6,10 @@ DROP TABLE IF EXISTS ldap_tree;
 
 CREATE TABLE ldap_tree (
     id BIGSERIAL PRIMARY KEY,
-    parent_id BIGINT,
-    rdn_norm VARCHAR(255) NOT NULL,
-    rdn_orig VARCHAR(255) NOT NULL,
-    parent_dn_norm VARCHAR(255), -- cache
+    parent_path VARCHAR(255), -- cache
     parent_dn_orig VARCHAR(255)  -- cache
 );
-CREATE UNIQUE INDEX idx_ldap_tree_parent_id_rdn_norm ON ldap_tree (parent_id, rdn_norm);
-CREATE UNIQUE INDEX idx_ldap_tree_parent_dn_norm_rdn_norm ON ldap_tree (parent_dn_norm, rdn_norm);
+CREATE INDEX idx_ldap_tree_parent_path ON ldap_tree (parent_path);
 
 DROP TABLE IF EXISTS ldap_member;
 

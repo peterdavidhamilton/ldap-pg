@@ -66,6 +66,16 @@ func NormalizeDN(suffix []string, dn string) (*DN, error) {
 	}, nil
 }
 
+// ParentPath returns parent DN's path string which is reversed of the parent DN norm.
+func (d *DN) ParentPath() string {
+	if d.IsDC() {
+		return "/"
+	}
+	// TODO encode '/' in DN
+	r := reverse(d.dnNorm)
+	return "/" + strings.Join(r[1:], "/")
+}
+
 func (d *DN) DNNormStr() string {
 	return strings.Join(d.dnNorm, ",")
 }
@@ -76,6 +86,9 @@ func (d *DN) DNOrigStr() string {
 
 func (d *DN) RDNNormStr() string {
 	if d.IsDC() {
+		// We don't use real RDN for DC like 'dc=example' here
+		// because our database doesn't contain the value.
+		// So it returns special value, "".
 		return ""
 	}
 	return d.dnNorm[0]
@@ -132,6 +145,8 @@ func (d *DN) Move(newParentDN *DN) (*DN, error) {
 	return NormalizeDN(d.suffix, newDN)
 }
 
+// ParentDN returns parent DN.
+// If current DN is DC, it returns nil.
 func (d *DN) ParentDN() *DN {
 	if d.IsDC() {
 		return nil
